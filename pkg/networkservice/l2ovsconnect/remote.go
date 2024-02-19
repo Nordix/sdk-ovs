@@ -61,6 +61,11 @@ func createRemoteCrossConnect(logger log.Logger, bridgeName string, endpointOvsP
 		ofRuleTo = fmt.Sprintf("priority=100,in_port=%d,tun_id=%d,actions=output:%d", ovsTunnelPortNum, vni, ovsLocalPortNum)
 	}
 	stdout, stderr, err := util.RunOVSOfctl("add-flow", "-OOpenflow13", bridgeName, ofRuleFrom)
+	OVSCmd := fmt.Sprintf("ovs-ofctl add-flow -OOpenflow13 %s %s", bridgeName, ofRuleFrom)
+	logger.
+		WithField("Cmd", OVSCmd).
+		WithField("stdout", stdout).
+		Debugf("RunOVSOfctl", "completed")
 	if err != nil {
 		logger.Errorf("Failed to add flow on %s for port %s stdout: %s"+
 			" stderr: %s, error: %v", bridgeName, ovsLocalPort, stdout, stderr, err)
@@ -72,6 +77,11 @@ func createRemoteCrossConnect(logger log.Logger, bridgeName string, endpointOvsP
 	}
 
 	stdout, stderr, err = util.RunOVSOfctl("add-flow", "-OOpenflow13", bridgeName, ofRuleTo)
+	OVSCmd = fmt.Sprintf("ovs-ofctl add-flow -OOpenflow13 %s %s", bridgeName, ofRuleTo)
+	logger.
+		WithField("Cmd", OVSCmd).
+		WithField("stdout", stdout).
+		Debugf("RunOVSOfctl", "completed")
 	if err != nil {
 		logger.Errorf("Failed to add tunnel flow on %s for port %s stdout: %s"+
 			" stderr: %s, error: %v", bridgeName, ovsTunnelPort, stdout, stderr, err)
@@ -116,6 +126,11 @@ func deleteRemoteCrossConnect(logger log.Logger, bridgeName string, endpointOvsP
 		ofMatch = fmt.Sprintf("in_port=%d", ovsLocalPortNum)
 	}
 	stdout, stderr, err := util.RunOVSOfctl("del-flows", "-OOpenflow13", bridgeName, ofMatch)
+	OVSCmd := fmt.Sprintf("ovs-ofctl del-flows -OOpenflow13 %s %s", bridgeName, ofMatch)
+	logger.
+		WithField("Cmd", OVSCmd).
+		WithField("stdout", stdout).
+		Debugf("RunOVSOfctl", "completed")
 	if err != nil {
 		logger.Errorf("Failed to delete flow on %s for port "+
 			"%s, stdout: %q, stderr: %q, error: %v", bridgeName, ovsLocalPort, stdout, stderr, err)
@@ -123,6 +138,11 @@ func deleteRemoteCrossConnect(logger log.Logger, bridgeName string, endpointOvsP
 	}
 
 	stdout, stderr, err = util.RunOVSOfctl("del-flows", "-OOpenflow13", bridgeName, fmt.Sprintf("in_port=%d,tun_id=%d", ovsTunnelPortNum, vni))
+	OVSCmd = fmt.Sprintf("ovs-ofctl del-flows -OOpenflow13 %s in_port=%d,tun_id=%d", bridgeName, ovsTunnelPortNum, vni)
+	logger.
+		WithField("Cmd", OVSCmd).
+		WithField("stdout", stdout).
+		Debugf("RunOVSOfctl", "completed")
 	if err != nil {
 		logger.Errorf("Failed to delete flow on %s for port "+
 			"%s on VNI %d, stdout: %q, stderr: %q, error: %v", bridgeName, ovsTunnelPort, vni, stdout, stderr, err)

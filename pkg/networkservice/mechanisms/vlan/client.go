@@ -127,6 +127,11 @@ func (c *vlanClient) addDelVlan(ctx context.Context, logger log.Logger, conn *ne
 				" error: %v", nsClientOvsPortInfo.PortName, c.bridgeName, stdout, stderr, err)
 			return errors.Wrapf(err, "Failed to delete port %s from %s, stdout: %q, stderr: %q", nsClientOvsPortInfo.PortName, c.bridgeName, stdout, stderr)
 		}
+		OVSVsctlCmd := fmt.Sprintf("ovs-vsctl del-port %s %s", c.bridgeName, nsClientOvsPortInfo.PortName)
+		log.FromContext(ctx).
+			WithField("Cmd", OVSVsctlCmd).
+			WithField("stdout", stdout).
+			Debugf("RunOVSVsctl", "completed")
 		stdout, stderr, err = util.RunOVSVsctl("--", "--may-exist", "add-port", l2Point.Bridge,
 			nsClientOvsPortInfo.PortName, fmt.Sprintf("tag=%d", mechanism.GetVlanID()))
 		if err != nil {
@@ -134,6 +139,11 @@ func (c *vlanClient) addDelVlan(ctx context.Context, logger log.Logger, conn *ne
 				" error: %v", nsClientOvsPortInfo.PortName, l2Point.Bridge, stdout, stderr, err)
 			return errors.Wrapf(err, "Failed to add port %s to %s, stdout: %q, stderr: %q", nsClientOvsPortInfo.PortName, l2Point.Bridge, stdout, stderr)
 		}
+		OVSVsctlCmd = fmt.Sprintf("ovs-vsctl -- --may-exist add-port %s %s tag=%d", l2Point.Bridge, nsClientOvsPortInfo.PortName, mechanism.GetVlanID())
+		log.FromContext(ctx).
+			WithField("Cmd", OVSVsctlCmd).
+			WithField("stdout", stdout).
+			Debugf("RunOVSVsctl", "completed")
 		nsClientOvsPortInfo.IsL2Connect = true
 		nsClientOvsPortInfo.IsCrossConnected = true
 	} else {
@@ -142,6 +152,11 @@ func (c *vlanClient) addDelVlan(ctx context.Context, logger log.Logger, conn *ne
 			logger.Errorf("Failed to delete port %s from %s, stdout: %q, stderr: %q,"+
 				" error: %v", nsClientOvsPortInfo.PortName, l2Point.Bridge, stdout, stderr, err)
 		}
+		OVSVsctlCmd := fmt.Sprintf("ovs-vsctl del-port %s %s", l2Point.Bridge, nsClientOvsPortInfo.PortName)
+		log.FromContext(ctx).
+			WithField("Cmd", OVSVsctlCmd).
+			WithField("stdout", stdout).
+			Debugf("RunOVSVsctl", "completed")
 	}
 	return nil
 }

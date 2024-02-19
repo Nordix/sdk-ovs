@@ -73,25 +73,26 @@ func NewSriovServer(ctx context.Context, name string, authzServer networkservice
 	authzMonitorServer networkservice.MonitorConnectionServer, tokenGenerator token.GeneratorFunc,
 	clientURL *url.URL, bridgeName string, tunnelIPCidr net.IP, pciPool resourcepool.PCIPool,
 	resourcePool resourcepool.ResourcePool, sriovConfig *config.Config, dialTimeout time.Duration,
-	l2Connections map[string]*ovsutil.L2ConnectionPoint, clientDialOptions ...grpc.DialOption) (endpoint.Endpoint, error) {
+	l2Connections map[string]*ovsutil.L2ConnectionPoint, isHostOvs bool,
+	clientDialOptions ...grpc.DialOption) (endpoint.Endpoint, error) {
 	resourceLock := &sync.Mutex{}
 	resourcePoolClient := resourcepool.NewClient(sriov.KernelDriver, resourceLock, pciPool, resourcePool, sriovConfig)
 	resourcePoolServer := resourcepool.NewServer(sriov.KernelDriver, resourceLock, pciPool, resourcePool, sriovConfig)
 
 	return newEndPoint(ctx, name, authzMonitorServer, authzServer, resourcePoolServer, resourcePoolClient, tokenGenerator,
-		clientURL, bridgeName, tunnelIPCidr, dialTimeout, l2Connections, clientDialOptions...)
+		clientURL, bridgeName, tunnelIPCidr, dialTimeout, l2Connections, isHostOvs, clientDialOptions...)
 }
 
 func newEndPoint(ctx context.Context, name string, authzMonitorServer networkservice.MonitorConnectionServer,
 	authzServer, resourcePoolServer networkservice.NetworkServiceServer,
 	resourcePoolClient networkservice.NetworkServiceClient, tokenGenerator token.GeneratorFunc, clientURL *url.URL,
 	bridgeName string, tunnelIPCidr net.IP, dialTimeout time.Duration, l2Connections map[string]*ovsutil.L2ConnectionPoint,
-	clientDialOptions ...grpc.DialOption) (endpoint.Endpoint, error) {
+	isHostOvs bool, clientDialOptions ...grpc.DialOption) (endpoint.Endpoint, error) {
 	tunnelIP, err := ovsutil.ParseTunnelIP(tunnelIPCidr)
 	if err != nil {
 		return nil, err
 	}
-	err = ovsutil.ConfigureOvS(ctx, l2Connections, bridgeName)
+	err = ovsutil.ConfigureOvS(ctx, l2Connections, bridgeName, isHostOvs)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +176,7 @@ func newEndPoint(ctx context.Context, name string, authzMonitorServer networkser
 func NewKernelServer(ctx context.Context, name string, authzServer networkservice.NetworkServiceServer,
 	authzMonitorServer networkservice.MonitorConnectionServer, tokenGenerator token.GeneratorFunc,
 	clientURL *url.URL, bridgeName string, tunnelIPCidr net.IP, dialTimeout time.Duration,
-	l2Connections map[string]*ovsutil.L2ConnectionPoint, clientDialOptions ...grpc.DialOption) (endpoint.Endpoint, error) {
+	l2Connections map[string]*ovsutil.L2ConnectionPoint, isHostOvs bool, clientDialOptions ...grpc.DialOption) (endpoint.Endpoint, error) {
 	return newEndPoint(ctx, name, authzMonitorServer, authzServer, null.NewServer(), null.NewClient(), tokenGenerator,
-		clientURL, bridgeName, tunnelIPCidr, dialTimeout, l2Connections, clientDialOptions...)
+		clientURL, bridgeName, tunnelIPCidr, dialTimeout, l2Connections, isHostOvs, clientDialOptions...)
 }

@@ -23,6 +23,7 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -68,7 +69,7 @@ func GetInterfaceOfPort(logger log.Logger, interfaceName string) (int, error) {
 }
 
 // ConfigureOvS creates ovs bridge and make it as an integration bridge
-func ConfigureOvS(ctx context.Context, l2Connections map[string]*L2ConnectionPoint, bridgeName string) error {
+func ConfigureOvS(ctx context.Context, l2Connections map[string]*L2ConnectionPoint, bridgeName string, isHostOvs bool) error {
 	// Initialize the ovs utility wrapper.
 	exec := kexec.New()
 	if err := util.SetExec(exec); err != nil {
@@ -77,10 +78,26 @@ func ConfigureOvS(ctx context.Context, l2Connections map[string]*L2ConnectionPoi
 
 	for _, cp := range l2Connections {
 		if cp.Bridge != "" {
+
+			now := time.Now()
+
 			// Create ovs bridge for l2 egress point
 			stdout, stderr, err := util.RunOVSVsctl("--", "--may-exist", "add-br", cp.Bridge)
+
+			OVSVsctlCmd := fmt.Sprintf("ovs-vsctl -- --may-exist add-br %s", cp.Bridge)
+			log.FromContext(ctx).
+				WithField("Cmd", OVSVsctlCmd).
+				WithField("stdout", stdout).
+				Debugf("RunOVSVsctl", "completed")
+
 			if err != nil {
 				log.FromContext(ctx).Warnf("Failed to add bridge %s, stdout: %q, stderr: %q, error: %v", bridgeName, stdout, stderr, err)
+			} else {
+				log.FromContext(ctx).
+					WithField("bridgeName", bridgeName).
+					WithField("connectionType", "l2-egress").
+					WithField("duration", time.Since(now)).
+					WithField("OVSVsctl", "add-br").Debug("completed")
 			}
 		}
 		if cp.Interface == "" {
@@ -92,14 +109,38 @@ func ConfigureOvS(ctx context.Context, l2Connections map[string]*L2ConnectionPoi
 		}
 	}
 
+	if isHostOvs {
+		return nil
+	}
+
+	now := time.Now()
+
 	// Create ovs bridge for client and endpoint connections
 	stdout, stderr, err := util.RunOVSVsctl("--", "--may-exist", "add-br", bridgeName)
+
+	OVSVsctlCmd := fmt.Sprintf("ovs-vsctl -- --may-exist add-br %s", bridgeName)
+	log.FromContext(ctx).
+		WithField("Cmd", OVSVsctlCmd).
+		WithField("stdout", stdout).
+		Debugf("RunOVSVsctl", "completed")
+
 	if err != nil {
 		log.FromContext(ctx).Warnf("Failed to add bridge %s, stdout: %q, stderr: %q, error: %v", bridgeName, stdout, stderr, err)
+	} else {
+		log.FromContext(ctx).
+			WithField("bridgeName", bridgeName).
+			WithField("duration", time.Since(now)).
+			WithField("OVSVsctl", "add-br").Debug("completed")
 	}
 
 	// Clean the flows from the above created ovs bridge
 	stdout, stderr, err = util.RunOVSOfctl("del-flows", bridgeName)
+	OVSVsctlCmd = fmt.Sprintf("ovs-vsctl del-flows %s", bridgeName)
+	log.FromContext(ctx).
+		WithField("Cmd", OVSVsctlCmd).
+		WithField("stdout", stdout).
+		Debugf("RunOVSVsctl", "completed")
+
 	if err != nil {
 		log.FromContext(ctx).Warnf("Failed to cleanup flows on %s "+
 			"stdout: %q, stderr: %q, error: %v", bridgeName, stdout, stderr, err)
@@ -134,12 +175,26 @@ func configureL2Interface(ctx context.Context, cp *L2ConnectionPoint) error {
 			return errors.Wrapf(err, "failed to delete IP address from link device")
 		}
 	}
+	now := time.Now()
 	stdout, stderr, err := util.RunOVSVsctl("--", "--may-exist", "add-port", cp.Bridge, cp.Interface)
+
+	OVSVsctlCmd := fmt.Sprintf("ovs-vsctl -- --may-exist add-port %s %s", cp.Bridge, cp.Interface)
+	log.FromContext(ctx).
+		WithField("Cmd", OVSVsctlCmd).
+		WithField("stdout", stdout).
+		Debugf("RunOVSVsctl", "completed")
+
 	if err != nil {
 		log.FromContext(ctx).Errorf("Failed to add l2 egress port %s to %s, stdout: %q, stderr: %q,"+
 			" error: %v", cp.Interface, cp.Bridge, stdout, stderr, err)
 		return errors.Wrap(err, "failed to run command via ovs-vsctl")
 	}
+	log.FromContext(ctx).
+		WithField("Bridge", cp.Bridge).
+		WithField("Interface", cp.Interface).
+		WithField("duration", time.Since(now)).
+		WithField("OVSVsctl", "add-port").Debug("completed")
+
 	link, err = netlink.LinkByName(cp.Bridge)
 	if err != nil {
 		return errors.Wrapf(err, "failed to find link %s", cp.Bridge)

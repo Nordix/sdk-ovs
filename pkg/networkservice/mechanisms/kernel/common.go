@@ -25,6 +25,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
 	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
@@ -87,12 +88,28 @@ func setupVeth(ctx context.Context, logger log.Logger, conn *networkservice.Conn
 	}
 
 	if _, exists := parentIfRefCountMap[hostIfName]; !exists {
+
+		now := time.Now()
+
 		stdout, stderr, err := util.RunOVSVsctl("--", "--may-exist", "add-port", bridgeName, hostIfName)
 		if err != nil {
 			logger.Errorf("Failed to add port %s to %s, stdout: %q, stderr: %q,"+
 				" error: %v", hostIfName, bridgeName, stdout, stderr, err)
 			return errors.Wrapf(err, "Failed to add port %s to %s, stdout: %q, stderr: %q", hostIfName, bridgeName, stdout, stderr)
 		}
+
+		OVSVsctlCmd := fmt.Sprintf("ovs-vsctl -- --may-exist add-port %s %s", bridgeName, hostIfName)
+		log.FromContext(ctx).
+			WithField("Cmd", OVSVsctlCmd).
+			WithField("stdout", stdout).
+			Debugf("RunOVSVsctl", "completed")
+
+		log.FromContext(ctx).
+			WithField("bridgeName", bridgeName).
+			WithField("hostIfName", hostIfName).
+			WithField("duration", time.Since(now)).
+			WithField("OVSVsctl", "add-port").Debug("completed")
+
 		parentIfRefCountMap[hostIfName] = 0
 	}
 	parentIfRefCountMap[hostIfName]++
@@ -151,6 +168,11 @@ func resetVeth(ctx context.Context, logger log.Logger, conn *networkservice.Conn
 				logger.Errorf("Failed to delete port %s from %s, stdout: %q, stderr: %q,"+
 					" error: %v", ifaceName, bridgeName, stdout, stderr, err)
 			}
+			OVSVsctlCmd := fmt.Sprintf("ovs-vsctl del-port %s %s", bridgeName, ifaceName)
+			log.FromContext(ctx).
+				WithField("Cmd", OVSVsctlCmd).
+				WithField("stdout", stdout).
+				Debugf("RunOVSVsctl", "completed")
 		}
 		/* Get a link object for the interface */
 		ifaceLink, err := netlink.LinkByName(ifaceName)
